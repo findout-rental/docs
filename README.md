@@ -25,22 +25,23 @@ FindOut consists of **4 main components**:
 1. **📱 Customer Mobile App** (Flutter)
    - For Tenants and Apartment Owners
    - Android & iOS support
-   - Repository: [findout-customer-app](https://github.com/findout-rental/findout-customer-app) *(Coming Soon)*
+   - Repository: [customer-app](https://github.com/findout-rental/customer-app) ✅
 
 2. **🌐 Admin Web Application** (Flutter Web)
    - For System Administrators
    - Browser-based dashboard
-   - Repository: [findout-admin-web](https://github.com/findout-rental/findout-admin-web) *(Coming Soon)*
+   - Repository: [admin-web](https://github.com/findout-rental/admin-web) ✅
 
 3. **⚙️ Backend API** (Laravel)
    - RESTful API
    - MySQL Database
-   - Repository: [findout-backend](https://github.com/findout-rental/findout-backend) *(Coming Soon)*
+   - Repository: [backend](https://github.com/findout-rental/backend) ✅
 
 4. **📖 Documentation** (This Repository)
    - All project documentation
    - Database schemas
    - Requirements specifications
+   - Repository: [docs](https://github.com/findout-rental/docs) ✅
 
 ## 🎯 Key Features
 
