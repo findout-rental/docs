@@ -128,19 +128,21 @@ Users must be able to register in the mobile application using their mobile numb
 - **REQ-M-001.2:** System shall send OTP via SMS to the provided mobile number
 - **REQ-M-001.3:** System shall verify OTP before allowing registration to proceed
 - **REQ-M-001.4:** System shall require users to select their role (Owner or Tenant) during registration
-- **REQ-M-001.5:** After OTP verification, system shall require users to complete all personal information fields:
+- **REQ-M-001.5:** After OTP verification, system shall require users to create login credentials (password)
+- **REQ-M-001.6:** After OTP verification, system shall require users to complete all personal information fields:
   - First Name (required)
   - Last Name (required)
   - Personal Photo (required)
   - Date of Birth (required)
   - ID Photo (required)
-- **REQ-M-001.6:** System shall set user status to "Pending" after registration submission
-- **REQ-M-001.7:** System shall prevent users from logging in until Admin approves their registration
+- **REQ-M-001.7:** System shall set user status to "Pending" after registration submission
+- **REQ-M-001.8:** System shall prevent users from logging in until Admin approves their registration
 
 **Input:**
 
 - Mobile number
-- OTP code
+- OTP code (for verification only)
+- Password (for future logins)
 - Role selection (Owner/Tenant)
 - Personal information (First Name, Last Name, Personal Photo, Date of Birth, ID Photo)
 
@@ -207,38 +209,40 @@ All users (tenants and apartment owners) must provide complete personal informat
 **Priority:** Mandatory (2 marks)
 
 **Description:**
-Users must be able to log in and log out of the mobile application.
+Users must be able to log in and log out of the mobile application using token-based authentication.
 
 **Functional Requirements:**
 
-- **REQ-M-003.1:** System shall allow users to log in using their registered mobile number
-- **REQ-M-003.2:** System shall send OTP via SMS for login verification
-- **REQ-M-003.3:** System shall verify OTP before granting access
-- **REQ-M-003.4:** System shall check user approval status before allowing login
-- **REQ-M-003.5:** System shall deny login if user status is "Pending" or "Rejected"
-- **REQ-M-003.6:** System shall allow approved users to log in successfully
+- **REQ-M-003.1:** System shall allow users to log in using their registered mobile number and stored credentials
+- **REQ-M-003.2:** System shall use token-based authentication (JWT) for secure session management
+- **REQ-M-003.3:** System shall check user approval status before allowing login
+- **REQ-M-003.4:** System shall deny login if user status is "Pending" or "Rejected"
+- **REQ-M-003.5:** System shall allow approved users to log in successfully
+- **REQ-M-003.6:** System shall maintain user session until logout or token expiration (24 hours of inactivity)
 - **REQ-M-003.7:** System shall provide logout functionality
-- **REQ-M-003.8:** System shall invalidate session upon logout
+- **REQ-M-003.8:** System shall invalidate session token upon logout
+- **REQ-M-003.9:** System shall securely store authentication tokens on the device (Keychain/Keystore)
+- **REQ-M-003.10:** System shall automatically refresh tokens before expiration for active users
 
 **Input:**
 
 - Mobile number
-- OTP code
+- Password/Credentials (established during registration)
 
 **Output:**
 
 - Login success or error message
-- User session token (on success)
+- User session token (JWT) on success
 
 **Preconditions:**
 
-- User must be registered
+- User must be registered (completed OTP verification during registration)
 - User must be approved by Admin
 
 **Postconditions:**
 
-- User session created (on successful login)
-- User session destroyed (on logout)
+- User session created with valid JWT token (on successful login)
+- User session destroyed and token invalidated (on logout)
 
 ---
 
@@ -1000,10 +1004,11 @@ System administrators must be able to delete users from the application.
 ### 7.1 Glossary
 
 - **Booking:** A reservation made by a tenant for an apartment for a specific period
-- **OTP:** One-Time Password sent via SMS for verification
+- **OTP:** One-Time Password sent via SMS for registration verification only (not used for login)
 - **Pending:** Status indicating waiting for approval
 - **RTL:** Right-to-Left text direction (for Arabic)
 - **LTR:** Left-to-Right text direction (for English)
+- **JWT:** JSON Web Token used for secure authentication and session management
 
 ### 7.2 Assumptions and Dependencies
 

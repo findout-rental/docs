@@ -48,6 +48,7 @@ This document describes the database design for FindOut application. The databas
 | ------------------- | --------------------------------------- | ----------------------------------------------------- | ------------------------------------ |
 | id                  | BIGINT UNSIGNED                         | PRIMARY KEY, AUTO_INCREMENT                           | Unique user identifier               |
 | mobile_number       | VARCHAR(20)                             | UNIQUE, NOT NULL                                      | User's mobile number for login       |
+| password            | VARCHAR(255)                            | NOT NULL                                              | Hashed password for authentication   |
 | first_name          | VARCHAR(100)                            | NOT NULL                                              | User's first name                    |
 | last_name           | VARCHAR(100)                            | NOT NULL                                              | User's last name                     |
 | personal_photo      | VARCHAR(255)                            | NOT NULL                                              | Path to personal photo               |
@@ -76,38 +77,48 @@ This document describes the database design for FindOut application. The databas
 
 **Attributes:**
 
-| Attribute    | Type                                  | Constraints                                           | Description                                                 |
-| ------------ | ------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------- |
-| id           | BIGINT UNSIGNED                       | PRIMARY KEY, AUTO_INCREMENT                           | Unique apartment identifier                                 |
-| owner_id     | BIGINT UNSIGNED                       | FOREIGN KEY, NOT NULL                                 | Reference to users.id (owner)                               |
-| governorate  | VARCHAR(100)                          | NOT NULL                                              | Governorate name                                            |
-| city         | VARCHAR(100)                          | NOT NULL                                              | City name                                                   |
-| address      | TEXT                                  | NOT NULL                                              | Full address                                                |
-| price        | DECIMAL(10, 2)                        | NOT NULL                                              | Rental price                                                |
-| price_period | ENUM('night', 'day', 'month')         | NOT NULL, DEFAULT 'night'                             | Price period (per night/day/month)                          |
-| bedrooms     | TINYINT UNSIGNED                      | NOT NULL                                              | Number of bedrooms                                          |
-| bathrooms    | TINYINT UNSIGNED                      | NOT NULL                                              | Number of bathrooms                                         |
-| living_rooms | TINYINT UNSIGNED                      | NOT NULL                                              | Number of living rooms                                      |
-| size         | DECIMAL(8, 2)                         | NOT NULL                                              | Apartment size in square meters                             |
-| description  | TEXT                                  | NULL                                                  | Apartment description                                       |
-| photos       | JSON                                  | NULL                                                  | Array of photo paths: ["photo1.jpg", "photo2.jpg"]          |
-| amenities    | JSON                                  | NULL                                                  | Array of amenities: ["WiFi", "Parking", "Air Conditioning"] |
-| status       | ENUM('active', 'inactive', 'deleted') | NOT NULL, DEFAULT 'active'                            | Apartment status                                            |
-| created_at   | TIMESTAMP                             | DEFAULT CURRENT_TIMESTAMP                             | Creation date                                               |
-| updated_at   | TIMESTAMP                             | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | Last update date                                            |
+| Attribute      | Type                                  | Constraints                                           | Description                                                 |
+| -------------- | ------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------- |
+| id             | BIGINT UNSIGNED                       | PRIMARY KEY, AUTO_INCREMENT                           | Unique apartment identifier                                 |
+| owner_id       | BIGINT UNSIGNED                       | FOREIGN KEY, NOT NULL                                 | Reference to users.id (owner)                               |
+| governorate    | VARCHAR(100)                          | NOT NULL                                              | Governorate name (English)                                  |
+| governorate_ar | VARCHAR(100)                          | NULL                                                  | Governorate name (Arabic)                                   |
+| city           | VARCHAR(100)                          | NOT NULL                                              | City name (English)                                         |
+| city_ar        | VARCHAR(100)                          | NULL                                                  | City name (Arabic)                                          |
+| address        | TEXT                                  | NOT NULL                                              | Full address (English)                                      |
+| address_ar     | TEXT                                  | NULL                                                  | Full address (Arabic)                                       |
+| price          | DECIMAL(10, 2)                        | NOT NULL                                              | Rental price                                                |
+| price_period   | ENUM('night', 'day', 'month')         | NOT NULL, DEFAULT 'night'                             | Price period (per night/day/month)                          |
+| bedrooms       | TINYINT UNSIGNED                      | NOT NULL                                              | Number of bedrooms                                          |
+| bathrooms      | TINYINT UNSIGNED                      | NOT NULL                                              | Number of bathrooms                                         |
+| living_rooms   | TINYINT UNSIGNED                      | NOT NULL                                              | Number of living rooms                                      |
+| size           | DECIMAL(8, 2)                         | NOT NULL                                              | Apartment size in square meters                             |
+| description    | TEXT                                  | NULL                                                  | Apartment description (English)                             |
+| description_ar | TEXT                                  | NULL                                                  | Apartment description (Arabic)                              |
+| photos         | JSON                                  | NULL                                                  | Array of photo paths: ["photo1.jpg", "photo2.jpg"]          |
+| amenities      | JSON                                  | NULL                                                  | Array of amenity keys: ["wifi", "parking", "ac"]            |
+| status         | ENUM('active', 'inactive', 'deleted') | NOT NULL, DEFAULT 'active'                            | Apartment status                                            |
+| created_at     | TIMESTAMP                             | DEFAULT CURRENT_TIMESTAMP                             | Creation date                                               |
+| updated_at     | TIMESTAMP                             | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | Last update date                                            |
 
 **Indexes:**
 
 - PRIMARY KEY (id)
 - FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
 - INDEX (governorate)
+- INDEX (governorate_ar)
 - INDEX (city)
+- INDEX (city_ar)
 - INDEX (status)
 - INDEX (price)
 
 **Notes:**
 
 - `photos` and `amenities` are stored as JSON arrays
+- `amenities` stores keys (e.g., "wifi", "parking") for frontend translation
+- Arabic columns (`governorate_ar`, `city_ar`, `address_ar`, `description_ar`) are optional
+- Owner can provide Arabic translations when adding/editing apartment
+- Frontend displays appropriate language based on user's language preference
 - Owner must be approved before creating apartments
 
 ---
@@ -265,8 +276,10 @@ This document describes the database design for FindOut application. The databas
 | id         | BIGINT UNSIGNED | PRIMARY KEY, AUTO_INCREMENT | Unique notification identifier                                                  |
 | user_id    | BIGINT UNSIGNED | FOREIGN KEY, NOT NULL       | Reference to users.id                                                           |
 | type       | VARCHAR(50)     | NOT NULL                    | Notification type (e.g., 'booking_approved', 'booking_rejected', 'new_message') |
-| title      | VARCHAR(255)    | NOT NULL                    | Notification title                                                              |
-| message    | TEXT            | NOT NULL                    | Notification message                                                            |
+| title      | VARCHAR(255)    | NOT NULL                    | Notification title (English)                                                    |
+| title_ar   | VARCHAR(255)    | NULL                        | Notification title (Arabic)                                                     |
+| message    | TEXT            | NOT NULL                    | Notification message (English)                                                  |
+| message_ar | TEXT            | NULL                        | Notification message (Arabic)                                                   |
 | booking_id | BIGINT UNSIGNED | FOREIGN KEY, NULL           | Reference to bookings.id (if related to booking)                                |
 | is_read    | BOOLEAN         | DEFAULT FALSE               | Read status                                                                     |
 | created_at | TIMESTAMP       | DEFAULT CURRENT_TIMESTAMP   | Notification timestamp                                                          |
@@ -282,7 +295,9 @@ This document describes the database design for FindOut application. The databas
 **Notes:**
 
 - Notifications sent for all booking status changes
-- Language preference from users table used for notification content
+- Backend generates notifications in both English and Arabic when creating
+- Frontend displays title/message based on user's language preference
+- Arabic columns (`title_ar`, `message_ar`) are optional but recommended
 - Can be linked to bookings or standalone
 
 ---
@@ -291,31 +306,31 @@ This document describes the database design for FindOut application. The databas
 
 **Table Name:** `otp_verifications`
 
-**Description:** Stores OTP codes for registration and login verification.
+**Description:** Stores OTP codes for registration verification only.
 
 **Attributes:**
 
-| Attribute     | Type                          | Constraints                 | Description                    |
-| ------------- | ----------------------------- | --------------------------- | ------------------------------ |
-| id            | BIGINT UNSIGNED               | PRIMARY KEY, AUTO_INCREMENT | Unique OTP identifier          |
-| mobile_number | VARCHAR(20)                   | NOT NULL                    | Mobile number for verification |
-| otp_code      | VARCHAR(6)                    | NOT NULL                    | 6-digit OTP code               |
-| purpose       | ENUM('registration', 'login') | NOT NULL                    | OTP purpose                    |
-| expires_at    | TIMESTAMP                     | NOT NULL                    | OTP expiration time            |
-| verified_at   | TIMESTAMP                     | NULL                        | When OTP was verified          |
-| created_at    | TIMESTAMP                     | DEFAULT CURRENT_TIMESTAMP   | OTP creation time              |
+| Attribute     | Type            | Constraints                 | Description                    |
+| ------------- | --------------- | --------------------------- | ------------------------------ |
+| id            | BIGINT UNSIGNED | PRIMARY KEY, AUTO_INCREMENT | Unique OTP identifier          |
+| mobile_number | VARCHAR(20)     | NOT NULL                    | Mobile number for verification |
+| otp_code      | VARCHAR(6)      | NOT NULL                    | 6-digit OTP code               |
+| expires_at    | TIMESTAMP       | NOT NULL                    | OTP expiration time            |
+| verified_at   | TIMESTAMP       | NULL                        | When OTP was verified          |
+| created_at    | TIMESTAMP       | DEFAULT CURRENT_TIMESTAMP   | OTP creation time              |
 
 **Indexes:**
 
 - PRIMARY KEY (id)
-- INDEX (mobile_number, purpose, expires_at)
+- INDEX (mobile_number, expires_at)
 - INDEX (expires_at)
 
 **Notes:**
 
+- OTP is used ONLY for registration verification, not for login
 - OTP expires after a set time (e.g., 5 minutes)
 - Old OTPs should be cleaned up periodically
-- One OTP per mobile number per purpose at a time
+- After successful OTP verification, user creates password for future logins
 
 ---
 
@@ -423,6 +438,7 @@ erDiagram
     USERS {
         bigint id PK
         varchar mobile_number UK
+        varchar password
         varchar first_name
         varchar last_name
         varchar personal_photo
@@ -439,8 +455,11 @@ erDiagram
         bigint id PK
         bigint owner_id FK
         varchar governorate
+        varchar governorate_ar
         varchar city
+        varchar city_ar
         text address
+        text address_ar
         decimal price
         enum price_period
         tinyint bedrooms
@@ -448,6 +467,7 @@ erDiagram
         tinyint living_rooms
         decimal size
         text description
+        text description_ar
         json photos
         json amenities
         enum status
@@ -502,7 +522,9 @@ erDiagram
         bigint user_id FK
         varchar type
         varchar title
+        varchar title_ar
         text message
+        text message_ar
         bigint booking_id FK
         boolean is_read
         timestamp created_at
@@ -512,7 +534,6 @@ erDiagram
         bigint id PK
         varchar mobile_number
         varchar otp_code
-        enum purpose
         timestamp expires_at
         timestamp verified_at
         timestamp created_at
@@ -530,6 +551,7 @@ erDiagram
 CREATE TABLE users (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     mobile_number VARCHAR(20) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     personal_photo VARCHAR(255) NOT NULL,
@@ -549,8 +571,11 @@ CREATE TABLE apartments (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     owner_id BIGINT UNSIGNED NOT NULL,
     governorate VARCHAR(100) NOT NULL,
+    governorate_ar VARCHAR(100),
     city VARCHAR(100) NOT NULL,
+    city_ar VARCHAR(100),
     address TEXT NOT NULL,
+    address_ar TEXT,
     price DECIMAL(10, 2) NOT NULL,
     price_period ENUM('night', 'day', 'month') NOT NULL DEFAULT 'night',
     bedrooms TINYINT UNSIGNED NOT NULL,
@@ -558,6 +583,7 @@ CREATE TABLE apartments (
     living_rooms TINYINT UNSIGNED NOT NULL,
     size DECIMAL(8, 2) NOT NULL,
     description TEXT,
+    description_ar TEXT,
     photos JSON,
     amenities JSON,
     status ENUM('active', 'inactive', 'deleted') NOT NULL DEFAULT 'active',
@@ -566,7 +592,9 @@ CREATE TABLE apartments (
     FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_owner (owner_id),
     INDEX idx_governorate (governorate),
+    INDEX idx_governorate_ar (governorate_ar),
     INDEX idx_city (city),
+    INDEX idx_city_ar (city_ar),
     INDEX idx_status (status),
     INDEX idx_price (price)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -644,7 +672,9 @@ CREATE TABLE notifications (
     user_id BIGINT UNSIGNED NOT NULL,
     type VARCHAR(50) NOT NULL,
     title VARCHAR(255) NOT NULL,
+    title_ar VARCHAR(255),
     message TEXT NOT NULL,
+    message_ar TEXT,
     booking_id BIGINT UNSIGNED,
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -659,11 +689,10 @@ CREATE TABLE otp_verifications (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     mobile_number VARCHAR(20) NOT NULL,
     otp_code VARCHAR(6) NOT NULL,
-    purpose ENUM('registration', 'login') NOT NULL,
     expires_at TIMESTAMP NOT NULL,
     verified_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_mobile_purpose (mobile_number, purpose, expires_at),
+    INDEX idx_mobile (mobile_number, expires_at),
     INDEX idx_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```

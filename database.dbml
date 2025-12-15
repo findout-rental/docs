@@ -14,6 +14,7 @@ Project FindOut {
 Table users {
   id bigint [pk, increment, note: 'Unique user identifier']
   mobile_number varchar(20) [unique, not null, note: 'User mobile number for login']
+  password varchar(255) [not null, note: 'Hashed password for authentication']
   first_name varchar(100) [not null, note: 'User first name']
   last_name varchar(100) [not null, note: 'User last name']
   personal_photo varchar(255) [not null, note: 'Path to personal photo']
@@ -38,18 +39,22 @@ Table users {
 Table apartments {
   id bigint [pk, increment, note: 'Unique apartment identifier']
   owner_id bigint [ref: > users.id, not null, note: 'Reference to owner']
-  governorate varchar(100) [not null, note: 'Governorate name']
-  city varchar(100) [not null, note: 'City name']
-  address text [not null, note: 'Full address']
+  governorate varchar(100) [not null, note: 'Governorate name (English)']
+  governorate_ar varchar(100) [note: 'Governorate name (Arabic)']
+  city varchar(100) [not null, note: 'City name (English)']
+  city_ar varchar(100) [note: 'City name (Arabic)']
+  address text [not null, note: 'Full address (English)']
+  address_ar text [note: 'Full address (Arabic)']
   price decimal(10,2) [not null, note: 'Rental price']
   price_period price_period_enum [not null, default: 'night', note: 'Price period']
   bedrooms tinyint [not null, note: 'Number of bedrooms']
   bathrooms tinyint [not null, note: 'Number of bathrooms']
   living_rooms tinyint [not null, note: 'Number of living rooms']
   size decimal(8,2) [not null, note: 'Apartment size in square meters']
-  description text [note: 'Apartment description']
+  description text [note: 'Apartment description (English)']
+  description_ar text [note: 'Apartment description (Arabic)']
   photos json [note: 'Array of photo paths']
-  amenities json [note: 'Array of amenities']
+  amenities json [note: 'Array of amenity keys for frontend translation']
   status apartment_status [not null, default: 'active', note: 'Apartment status']
   created_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'Creation date']
   updated_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'Last update date']
@@ -57,7 +62,9 @@ Table apartments {
   indexes {
     owner_id [name: 'idx_owner']
     governorate [name: 'idx_governorate']
+    governorate_ar [name: 'idx_governorate_ar']
     city [name: 'idx_city']
+    city_ar [name: 'idx_city_ar']
     status [name: 'idx_status']
     price [name: 'idx_price']
   }
@@ -160,8 +167,10 @@ Table notifications {
   id bigint [pk, increment, note: 'Unique notification identifier']
   user_id bigint [ref: > users.id, not null, note: 'Reference to user']
   type varchar(50) [not null, note: 'Notification type']
-  title varchar(255) [not null, note: 'Notification title']
-  message text [not null, note: 'Notification message']
+  title varchar(255) [not null, note: 'Notification title (English)']
+  title_ar varchar(255) [note: 'Notification title (Arabic)']
+  message text [not null, note: 'Notification message (English)']
+  message_ar text [note: 'Notification message (Arabic)']
   booking_id bigint [ref: > bookings.id, note: 'Reference to booking (if related)']
   is_read boolean [default: false, note: 'Read status']
   created_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'Notification timestamp']
@@ -171,28 +180,27 @@ Table notifications {
     created_at [name: 'idx_created']
   }
   
-  Note: 'Notifications sent for all booking status changes'
+  Note: 'Notifications sent for all booking status changes. Backend generates in both languages.'
 }
 
 // =====================================================
 // Table: otp_verifications
-// Description: Stores OTP codes for registration and login verification
+// Description: Stores OTP codes for registration verification only
 // =====================================================
 Table otp_verifications {
   id bigint [pk, increment, note: 'Unique OTP identifier']
   mobile_number varchar(20) [not null, note: 'Mobile number for verification']
   otp_code varchar(6) [not null, note: '6-digit OTP code']
-  purpose otp_purpose [not null, note: 'OTP purpose: registration or login']
   expires_at timestamp [not null, note: 'OTP expiration time']
   verified_at timestamp [note: 'When OTP was verified']
   created_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'OTP creation time']
   
   indexes {
-    (mobile_number, purpose, expires_at) [name: 'idx_mobile_purpose']
+    (mobile_number, expires_at) [name: 'idx_mobile']
     expires_at [name: 'idx_expires']
   }
   
-  Note: 'OTP expires after a set time (e.g., 5 minutes)'
+  Note: 'OTP is used ONLY for registration verification, not for login'
 }
 
 // =====================================================
@@ -236,11 +244,6 @@ Enum booking_status {
   modified_approved
   modified_rejected
   completed
-}
-
-Enum otp_purpose {
-  registration
-  login
 }
 
 // =====================================================

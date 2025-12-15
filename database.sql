@@ -23,6 +23,7 @@ DROP TABLE IF EXISTS users;
 CREATE TABLE users (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     mobile_number VARCHAR(20) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     personal_photo VARCHAR(255) NOT NULL,
@@ -47,8 +48,11 @@ CREATE TABLE apartments (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     owner_id BIGINT UNSIGNED NOT NULL,
     governorate VARCHAR(100) NOT NULL,
+    governorate_ar VARCHAR(100),
     city VARCHAR(100) NOT NULL,
+    city_ar VARCHAR(100),
     address TEXT NOT NULL,
+    address_ar TEXT,
     price DECIMAL(10, 2) NOT NULL,
     price_period ENUM('night', 'day', 'month') NOT NULL DEFAULT 'night',
     bedrooms TINYINT UNSIGNED NOT NULL,
@@ -56,6 +60,7 @@ CREATE TABLE apartments (
     living_rooms TINYINT UNSIGNED NOT NULL,
     size DECIMAL(8, 2) NOT NULL,
     description TEXT,
+    description_ar TEXT,
     photos JSON,
     amenities JSON,
     status ENUM('active', 'inactive', 'deleted') NOT NULL DEFAULT 'active',
@@ -68,7 +73,9 @@ CREATE TABLE apartments (
     -- Indexes
     INDEX idx_owner (owner_id),
     INDEX idx_governorate (governorate),
+    INDEX idx_governorate_ar (governorate_ar),
     INDEX idx_city (city),
+    INDEX idx_city_ar (city_ar),
     INDEX idx_status (status),
     INDEX idx_price (price)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -188,7 +195,9 @@ CREATE TABLE notifications (
     user_id BIGINT UNSIGNED NOT NULL,
     type VARCHAR(50) NOT NULL,
     title VARCHAR(255) NOT NULL,
+    title_ar VARCHAR(255),
     message TEXT NOT NULL,
+    message_ar TEXT,
     booking_id BIGINT UNSIGNED,
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -204,19 +213,18 @@ CREATE TABLE notifications (
 
 -- =====================================================
 -- Table: otp_verifications
--- Description: Stores OTP codes for registration and login verification
+-- Description: Stores OTP codes for registration verification only
 -- =====================================================
 CREATE TABLE otp_verifications (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     mobile_number VARCHAR(20) NOT NULL,
     otp_code VARCHAR(6) NOT NULL,
-    purpose ENUM('registration', 'login') NOT NULL,
     expires_at TIMESTAMP NOT NULL,
     verified_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     -- Indexes
-    INDEX idx_mobile_purpose (mobile_number, purpose, expires_at),
+    INDEX idx_mobile (mobile_number, expires_at),
     INDEX idx_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
