@@ -148,7 +148,7 @@ The admin web application uses a **sidebar navigation layout**:
 
 Admin authentication uses **pre-created accounts** (no self-registration):
 - Admin accounts are created manually by super admin or database
-- Admins log in with **Email + Password**
+- Admins log in with **Mobile Number + Password**
 - No OTP verification required
 - JWT token-based session management
 
@@ -184,11 +184,11 @@ Allow system administrators to authenticate and access the admin panel.
 - **Subheadline**: "Sign in to your admin account"
 
 **Login Form:**
-- **Email Input**:
-  - Label: "Email Address"
-  - Type: Email
-  - Placeholder: "admin@findout.com"
-  - Validation: Valid email format
+- **Mobile Number Input**:
+  - Label: "Mobile Number"
+  - Type: Tel
+  - Placeholder: "+201234567890"
+  - Validation: Valid mobile number format
   - Auto-focus on page load
 - **Password Input**:
   - Label: "Password"
@@ -211,7 +211,7 @@ Allow system administrators to authenticate and access the admin panel.
 - Terms of Service link
 
 #### User Actions
-- Enter email and password
+- Enter mobile number and password
 - Tap "Sign In" →
   - Show loading state
   - Authenticate credentials
@@ -230,14 +230,14 @@ Allow system administrators to authenticate and access the admin panel.
 - Button disabled during authentication
 
 #### Error States
-- **Invalid Credentials**: "Invalid email or password. Please try again."
+- **Invalid Credentials**: "Invalid mobile number or password. Please try again."
   - Display below form, red text
 - **Account Locked**: "Your account has been locked. Please contact support."
 - **Network Error**: "Unable to connect. Please check your internet connection."
 - **Server Error**: "Something went wrong. Please try again later."
 
 #### Validation Rules
-- Email: Required, valid email format
+- Mobile Number: Required, valid mobile number format
 - Password: Required, not empty
 - Both fields must be filled to enable Sign In button
 
@@ -249,7 +249,7 @@ Allow system administrators to authenticate and access the admin panel.
   - Request:
     ```json
     {
-      "email": "admin@findout.com",
+      "mobile_number": "+201234567890",
       "password": "password123"
     }
     ```
@@ -260,7 +260,7 @@ Allow system administrators to authenticate and access the admin panel.
       "token": "jwt_token_here",
       "admin": {
         "id": 1,
-        "email": "admin@findout.com",
+        "mobile_number": "+201234567890",
         "first_name": "Admin",
         "last_name": "User",
         "personal_photo": "url",
