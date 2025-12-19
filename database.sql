@@ -7,6 +7,7 @@
 -- =====================================================
 
 -- Drop existing tables if they exist (in reverse order of dependencies)
+DROP TABLE IF EXISTS transactions;
 DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS messages;
 DROP TABLE IF EXISTS favorites;
@@ -32,6 +33,7 @@ CREATE TABLE users (
     role ENUM('tenant', 'owner', 'admin') NOT NULL,
     status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
     language_preference ENUM('ar', 'en') DEFAULT 'en',
+    balance DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
@@ -53,8 +55,8 @@ CREATE TABLE apartments (
     city_ar VARCHAR(100),
     address TEXT NOT NULL,
     address_ar TEXT,
-    price DECIMAL(10, 2) NOT NULL,
-    price_period ENUM('night', 'day', 'month') NOT NULL DEFAULT 'night',
+    nightly_price DECIMAL(10, 2) NOT NULL,
+    monthly_price DECIMAL(10, 2) NOT NULL,
     bedrooms TINYINT UNSIGNED NOT NULL,
     bathrooms TINYINT UNSIGNED NOT NULL,
     living_rooms TINYINT UNSIGNED NOT NULL,
@@ -77,7 +79,7 @@ CREATE TABLE apartments (
     INDEX idx_city (city),
     INDEX idx_city_ar (city_ar),
     INDEX idx_status (status),
-    INDEX idx_price (price)
+    INDEX idx_nightly_price (nightly_price)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================
@@ -92,6 +94,7 @@ CREATE TABLE bookings (
     check_out_date DATE NOT NULL,
     number_of_guests TINYINT UNSIGNED,
     payment_method VARCHAR(50) NOT NULL,
+    total_rent DECIMAL(10, 2) NOT NULL,
     status ENUM(
         'pending', 
         'approved', 
@@ -229,6 +232,32 @@ CREATE TABLE otp_verifications (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================
+-- Table: transactions
+-- Description: Stores all balance transactions (deposits, withdrawals, payments, refunds)
+-- =====================================================
+CREATE TABLE transactions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    type ENUM('deposit', 'withdrawal', 'rent_payment', 'refund', 'cancellation_fee') NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    related_booking_id BIGINT UNSIGNED,
+    related_user_id BIGINT UNSIGNED,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Foreign Keys
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (related_booking_id) REFERENCES bookings(id) ON DELETE SET NULL,
+    FOREIGN KEY (related_user_id) REFERENCES users(id) ON DELETE SET NULL,
+    
+    -- Indexes
+    INDEX idx_user (user_id),
+    INDEX idx_type (type),
+    INDEX idx_booking (related_booking_id),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
 -- Summary of Relationships:
 -- =====================================================
 -- 1. users (1) -> (M) apartments (owner_id) [CASCADE DELETE]
@@ -243,6 +272,8 @@ CREATE TABLE otp_verifications (
 -- 10. apartments (1) -> (M) favorites (apartment_id) [CASCADE DELETE]
 -- 11. bookings (1) -> (1) ratings (booking_id) [CASCADE DELETE, UNIQUE]
 -- 12. bookings (1) -> (M) notifications (booking_id) [SET NULL]
+-- 13. users (1) -> (M) transactions (user_id) [CASCADE DELETE]
+-- 14. bookings (1) -> (M) transactions (related_booking_id) [SET NULL]
 -- =====================================================
 
 -- =====================================================

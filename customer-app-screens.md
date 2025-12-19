@@ -857,7 +857,7 @@ Main landing screen for tenants to browse available apartments. First screen sho
     - Photo indicators (dots): 1/5
     - Favorite heart icon (top-right corner, filled if favorited)
   - **Location**: City, Governorate
-  - **Price**: "EGP 500/night" (or day/month based on price_period)
+  - **Price**: "EGP 500/night or EGP 8,000/month" (displays both nightly and monthly rates)
   - **Rating**: ⭐ 4.5 (35 reviews) - or "New" if no ratings
   - **Specs**: 2 🛏️ | 1 🛁 | 1 🛋️ | 80 m²
   - **Amenities chips**: WiFi, Parking, A/C (max 3 visible)
@@ -940,8 +940,8 @@ Main landing screen for tenants to browse available apartments. First screen sho
             "photos": ["url1", "url2"],
             "governorate": "Cairo",
             "city": "New Cairo",
-            "price": 500.00,
-            "price_period": "night",
+            "nightly_price": 500.00,
+            "monthly_price": 8000.00,
             "bedrooms": 2,
             "bathrooms": 1,
             "living_rooms": 1,
@@ -1019,8 +1019,8 @@ Allow tenants to filter apartments by location, price, and specifications. Opens
   - Label: "Maximum Price"
   - Placeholder: "Any"
   - Numeric keyboard
-- **Price Period Selector:**
-  - Radio buttons: Per Night | Per Day | Per Month
+- **Price Range Note:**
+  - Info: "Price filtering uses nightly rates. System automatically applies best rate (nightly or monthly) based on booking duration."
 
 **3. Specifications Section:**
 - Section header: "Specifications"
@@ -1237,8 +1237,8 @@ Display comprehensive information about a specific apartment, including photos, 
         "governorate": "Cairo",
         "city": "New Cairo",
         "address": "Full address text",
-        "price": 500.00,
-        "price_period": "night",
+        "nightly_price": 500.00,
+        "monthly_price": 8000.00,
         "bedrooms": 2,
         "bathrooms": 1,
         "living_rooms": 1,
@@ -1482,7 +1482,7 @@ Allow tenant to select check-in and check-out dates for booking, showing apartme
 - Blocked dates include all approved and pending bookings
 - Calendar should load 3 months ahead initially
 - Consider showing minimum/maximum stay requirements if applicable
-- Price calculation should account for price_period (night/day/month)
+- Price calculation uses nightly_price and monthly_price, automatically selecting the better rate based on booking duration
 
 ---
 
@@ -1528,8 +1528,21 @@ Collect additional booking information (number of guests, payment method) before
 - Note: "No actual payment required. This is for confirmation only."
 
 **Price Breakdown Card:**
-- Base price: "EGP 500 × 3 nights = EGP 1,500"
+- Nightly rate: "EGP 500/night"
+- Monthly rate: "EGP 8,000/month"
+- Booking duration: "3 nights"
+- Calculation: "EGP 500 × 3 nights = EGP 1,500" (for short stays) or shows monthly rate calculation if applicable
 - Total: "EGP 1,500" (large, bold)
+- Info: "System automatically uses the best rate for your booking duration"
+
+**Balance & Payment Info Card:**
+- Current Balance: "EGP 2,000.00" (displayed prominently)
+- Required Amount: "EGP 1,500.00"
+- Balance Status:
+  - If sufficient: ✓ "Sufficient balance" (green)
+  - If insufficient: ⚠️ "Insufficient balance" (red, with amount needed)
+- Info text: "Rent will be deducted from your balance when booking is submitted"
+- If insufficient: "Top up your balance" button → Navigate to profile/balance screen
 
 **Terms & Conditions:**
 - Checkbox: "I agree to the Terms & Conditions and Cancellation Policy"
@@ -1559,6 +1572,10 @@ Collect additional booking information (number of guests, payment method) before
 - Message: "Submitting your booking request..."
 
 #### Error States
+- **Insufficient Balance**: 
+  - Red banner: "Insufficient balance. Required: EGP 1,500.00, Available: EGP 500.00"
+  - "Top up Balance" button to navigate to profile
+  - Submit button disabled
 - **Payment Method Required**: "Please select a payment method"
 - **Terms Not Accepted**: "Please accept Terms & Conditions to continue"
 - **Submission Error**: "Unable to submit booking. Please try again."
@@ -1566,6 +1583,7 @@ Collect additional booking information (number of guests, payment method) before
   - Redirect back to date selection screen
 
 #### Validation Rules
+- Tenant balance must be sufficient (balance >= total_rent)
 - Payment method must be selected
 - Terms & Conditions must be accepted
 - Number of guests must be at least 1
@@ -1574,7 +1592,8 @@ Collect additional booking information (number of guests, payment method) before
 #### Related Entities
 - `bookings` table (create new booking)
 - `apartments` table (reference apartment)
-- `users` table (tenant)
+- `users` table (tenant, check balance)
+- `transactions` table (create rent_payment transactions)
 
 #### API Endpoints
 - `POST /api/tenant/bookings`
@@ -1601,9 +1620,11 @@ Collect additional booking information (number of guests, payment method) before
     ```
 
 #### Notes
-- Booking is created with status = "pending"
+- System checks tenant balance before allowing submission
+- Rent is deducted from tenant balance and added to owner balance immediately when booking is created
+- Transaction records are created for both tenant and owner
+- Booking is created with status = "pending" and total_rent stored
 - Owner receives notification immediately
-- No actual payment processing at this stage
 - Consider adding special requests text field in future
 
 ---
@@ -1630,12 +1651,21 @@ Confirm successful booking submission and inform tenant about next steps.
 - Apartment photo, name
 - Check-in: [Date]
 - Check-out: [Date]
+- Duration: "3 nights"
 - Status badge: "Pending Approval" (yellow/orange)
+
+**Payment Confirmation Card:**
+- ✓ "Payment Processed"
+- Amount Paid: "EGP 1,500.00"
+- Remaining Balance: "EGP 500.00"
+- Info: "Rent has been deducted from your balance. If booking is rejected, full refund will be processed automatically."
 
 **Information Box:**
 - "What happens next?"
+  - ✓ "Rent has been deducted from your balance"
   - ✓ "The owner will review your request"
   - ✓ "You'll be notified of their decision"
+  - ✓ "If rejected, full refund will be processed automatically"
   - ✓ "This usually takes 24-48 hours"
 
 **Action Buttons:**
@@ -1657,7 +1687,9 @@ Confirm successful booking submission and inform tenant about next steps.
 - N/A (success screen)
 
 #### Related Entities
-- `bookings` table (created booking)
+- `bookings` table (created booking with total_rent)
+- `users` table (updated tenant and owner balances)
+- `transactions` table (rent_payment transactions created)
 - `notifications` table (notification sent to owner)
 
 #### Notes
@@ -1850,8 +1882,17 @@ Display comprehensive details of a specific booking with status-appropriate acti
 - **Duration**: 3 nights
 - **Number of Guests**: 2 people
 - **Payment Method**: Cash
-- **Total Price**: EGP 1,500
+- **Total Rent Paid**: EGP 1,500
 - **Booked on**: Dec 10, 2024
+
+**Payment Information Card:**
+- **Payment Status**: 
+  - If pending/approved: ✓ "Paid - EGP 1,500.00"
+  - If rejected: "Refunded - EGP 1,500.00" (green, with refund icon)
+  - If cancelled: "Partial Refund - EGP 1,200.00" (80% refunded) + "Cancellation Fee - EGP 300.00" (20%)
+- **Payment Date**: Dec 10, 2024
+- If refunded: **Refund Date**: [Date when refund processed]
+- **View Transaction Details** link → Navigate to Transaction History filtered by this booking
 
 **Apartment Information Card:**
 - Apartment photo
@@ -1908,9 +1949,10 @@ Display comprehensive details of a specific booking with status-appropriate acti
   - Retry button
 
 #### Related Entities
-- `bookings` table (fetch booking details)
+- `bookings` table (fetch booking details with total_rent)
 - `apartments` table (fetch apartment details)
 - `users` table (fetch owner details)
+- `transactions` table (fetch payment/refund transactions related to booking)
 
 #### API Endpoints
 - `GET /api/tenant/bookings/{booking_id}`
@@ -2306,8 +2348,8 @@ Display all apartments saved by the tenant as favorites for quick access and boo
             "photos": ["url1"],
             "governorate": "Cairo",
             "city": "New Cairo",
-            "price": 500.00,
-            "price_period": "night",
+            "nightly_price": 500.00,
+            "monthly_price": 8000.00,
             "bedrooms": 2,
             "bathrooms": 1,
             "living_rooms": 1,
@@ -2471,8 +2513,8 @@ Main landing screen for owners displaying all their apartment listings. First sc
             "address": "Full address",
             "governorate": "Cairo",
             "city": "New Cairo",
-            "price": 500.00,
-            "price_period": "night",
+            "nightly_price": 500.00,
+            "monthly_price": 8000.00,
             "status": "active",
             "bedrooms": 2,
             "bathrooms": 1,
@@ -2549,14 +2591,20 @@ Allow owners to create a new apartment listing with all required information.
   - Max length: 500 characters
 
 **3. Price Section (Required):**
-- Label: "Rental Price"
-- **Price Input** (required)
+- Label: "Rental Prices"
+- **Nightly Price** (required)
+  - Label: "Price per Night"
   - Placeholder: "0.00"
   - Numeric keyboard
   - Currency: EGP
-- **Price Period Selector** (required)
-  - Radio buttons: ○ Per Night | ○ Per Day | ○ Per Month
-  - Default: Per Night
+  - Helper text: "Price for short-term bookings (per night)"
+- **Monthly Price** (required)
+  - Label: "Price per Month"
+  - Placeholder: "0.00"
+  - Numeric keyboard
+  - Currency: EGP
+  - Helper text: "Price for long-term bookings (per month, 30 days)"
+- Info: "System automatically uses the best rate based on booking duration. For bookings over 30 days, the cheaper option (daily vs monthly) will be used."
 
 **4. Specifications Section (Required):**
 - Label: "Apartment Specifications"
@@ -2649,8 +2697,8 @@ Allow owners to create a new apartment listing with all required information.
 - **Governorate**: Required
 - **City**: Required (dependent on governorate)
 - **Address**: Required, min 10 chars, max 500 chars
-- **Price**: Required, must be > 0
-- **Price Period**: Required (default: night)
+- **Nightly Price**: Required, must be > 0
+- **Monthly Price**: Required, must be > 0
 - **Bedrooms**: Required, min 0, max 10
 - **Bathrooms**: Required, min 1, max 10
 - **Living Rooms**: Required, min 0, max 5
@@ -3248,6 +3296,8 @@ Display comprehensive details of a booking request with approve/reject actions.
 
 ### 6.1 Overview
 
+Shared screens are accessible by both tenants and owners through the Profile tab in bottom navigation.
+
 Shared screens are accessible to **both Tenants and Owners** with identical or slightly adapted functionality. These screens provide:
 - In-app messaging between users
 - Notification management
@@ -3729,7 +3779,17 @@ Display user profile information and provide access to settings and app features
 - **Member Since**: "Member since Dec 2024"
 - **Edit Profile** button (pencil icon, top-right of header)
 
-**2. Account Information Section:**
+**2. Account Balance Section:**
+- Section header: "Account Balance"
+- **Current Balance**: "EGP 2,500.00" (large, prominent display)
+- **Balance Status**: 
+  - Positive: Green display with currency symbol
+  - Zero: Gray display
+  - Negative: Red display (if allowed, unlikely)
+- **View Transaction History** button → Navigate to Transaction History Screen (SHARED-008)
+- Info text: "Contact admin to add money to your balance"
+
+**3. Account Information Section:**
 - Section header: "Account"
 - **Mobile Number**: +20 XXX XXX XXXX
 - **Email**: email@example.com (if collected)
@@ -3737,7 +3797,7 @@ Display user profile information and provide access to settings and app features
 - Non-editable (display only)
 - Info: "Contact support to change account information"
 
-**3. App Settings Section:**
+**4. App Settings Section:**
 - Section header: "Settings"
 - **Language** →
   - Current: "English" or "العربية"
@@ -3748,7 +3808,7 @@ Display user profile information and provide access to settings and app features
 - **Notifications** →
   - Tap → Navigate to Notification Settings (future)
 
-**4. Statistics Section (Role-specific):**
+**5. Statistics Section (Role-specific):**
 
 **For Owners:**
 - Section header: "My Statistics"
@@ -3763,7 +3823,7 @@ Display user profile information and provide access to settings and app features
 - Reviews Given: [Count]
 - Member Since: [Date]
 
-**5. Support & Legal Section:**
+**6. Support & Legal Section:**
 - Section header: "Support"
 - **Help Center** → Opens help/FAQ
 - **Contact Support** → Opens support chat/email
@@ -3771,11 +3831,12 @@ Display user profile information and provide access to settings and app features
 - **Privacy Policy** → Opens privacy page
 - **About** → App version, credits
 
-**6. Logout Section:**
+**7. Logout Section:**
 - **Logout** button (red text, centered)
 
 #### User Actions
 - Tap "Edit Profile" → Navigate to Edit Profile Screen (SHARED-005)
+- Tap "View Transaction History" → Navigate to Transaction History Screen (SHARED-008)
 - Tap Language → Navigate to Language Settings (SHARED-006)
 - Tap Theme → Navigate to Theme Settings (SHARED-007)
 - Tap Notifications → Navigate to Notification Settings
@@ -3799,7 +3860,7 @@ Display user profile information and provide access to settings and app features
 - Actions: "Cancel" | "Logout"
 
 #### Related Entities
-- `users` table (fetch user information)
+- `users` table (fetch user information including balance)
 - `apartments` table (count owner's apartments)
 - `bookings` table (count bookings)
 - `ratings` table (count reviews, calculate average)
@@ -3827,7 +3888,8 @@ Display user profile information and provide access to settings and app features
           "total_bookings": 12,
           "average_rating": 4.5,
           "reviews_given": 8
-        }
+        },
+        "balance": 2500.00
       }
     }
     ```
@@ -3840,10 +3902,217 @@ Display user profile information and provide access to settings and app features
 - Language preference applies after confirmation
 - Logout clears JWT token and returns to login screen
 - Consider adding profile completion percentage
+- Balance updates in real-time when transactions occur
 
 ---
 
-### 6.1.5 Edit Profile Screen
+### 6.1.5 Transaction History Screen
+
+**Screen ID**: `SHARED-008`
+
+#### Purpose
+Display user's complete transaction history including deposits, withdrawals, rent payments, refunds, and cancellation fees.
+
+#### User Entry Points
+- From Profile Screen → Tap "View Transaction History"
+- From Booking Detail Screen → Tap "View Transaction Details"
+
+#### UI Components
+
+**Top App Bar:**
+- Back button (left)
+- Title: "Transaction History"
+- Filter icon (right) → Opens filter dialog
+
+**Current Balance Banner:**
+- **Current Balance**: "EGP 2,500.00" (large, prominent)
+- Update timestamp: "Updated: Dec 15, 2024, 10:30 AM"
+
+**Filter Bar (Optional, below banner):**
+- **Filter by Type**: All | Deposits | Withdrawals | Rent Payments | Refunds | Cancellation Fees
+- **Date Range**: This Month | Last Month | Last 3 Months | All Time
+- **Sort**: Newest First | Oldest First
+
+**Transaction List:**
+
+**Transaction Item (for each transaction):**
+
+**For Deposit:**
+- Icon: 💰 (green)
+- Type: "Deposit"
+- Amount: "+EGP 500.00" (green, positive)
+- Description: "Cash deposit from admin" or admin's notes
+- Date: "Dec 15, 2024, 10:30 AM"
+- Related: None (or "Admin Deposit")
+
+**For Withdrawal:**
+- Icon: 💸 (orange)
+- Type: "Withdrawal"
+- Amount: "-EGP 200.00" (orange, negative)
+- Description: "Cash withdrawal by admin" or admin's notes
+- Date: "Dec 14, 2024, 2:15 PM"
+- Related: None (or "Admin Withdrawal")
+
+**For Rent Payment:**
+- Icon: 🏠 (blue)
+- Type: "Rent Payment"
+- Amount: "-EGP 1,500.00" (red, negative)
+- Description: "Rent payment for booking #12345"
+- Apartment: "Apartment Name, Address" (tappable → navigate to apartment)
+- Booking: "Booking #12345" (tappable → navigate to booking detail)
+- Date: "Dec 10, 2024, 9:00 AM"
+
+**For Refund:**
+- Icon: 🔄 (green)
+- Type: "Refund"
+- Amount: "+EGP 1,500.00" (green, positive)
+- Description: "Full refund - Booking #12345 rejected by owner"
+- Or: "Partial refund - Booking #12345 cancelled (80%)"
+- Booking: "Booking #12345" (tappable → navigate to booking detail)
+- Date: "Dec 12, 2024, 3:20 PM"
+
+**For Cancellation Fee:**
+- Icon: ⚠️ (orange)
+- Type: "Cancellation Fee"
+- Amount: "EGP 300.00" (gray, informational only - no balance change)
+- Description: "Cancellation fee - Owner keeps 20% for booking #12345"
+- Booking: "Booking #12345" (tappable → navigate to booking detail)
+- Date: "Dec 12, 2024, 3:20 PM"
+- Note: "This fee was deducted from your refund"
+
+**Transaction Grouping (Optional):**
+- Group by date: "Today", "Yesterday", "This Week", "This Month", "[Date]"
+
+**Empty State:**
+- Icon: 📊
+- Message: "No transactions yet"
+- Description: "Your transaction history will appear here"
+
+**Load More:**
+- Pagination or "Load More" button at bottom
+
+#### User Actions
+- Tap transaction item → If related to booking, navigate to Booking Detail Screen
+- Tap apartment link → Navigate to Apartment Detail Screen
+- Tap booking link → Navigate to Booking Detail Screen
+- Tap filter icon → Open filter dialog
+- Select filter → Apply filter and reload transactions
+- Scroll to bottom → Load more transactions (pagination)
+- Pull to refresh → Reload transaction list
+
+#### Empty States
+**No Transactions:**
+- Icon: 📊
+- Message: "No transactions yet"
+- Description: "Your transaction history will appear here once you make bookings or admin adds money to your balance"
+
+**No Filter Results:**
+- Icon: 🔍
+- Message: "No transactions match your filter"
+- Action: "Clear Filters" button
+
+#### Loading States
+**Initial Load:**
+- Skeleton loaders for transaction items (5-10 items)
+
+**Loading More:**
+- Loading indicator at bottom of list
+
+#### Error States
+- **Load Error**: "Unable to load transactions. Please try again."
+  - Retry button
+
+#### Filter Dialog
+
+**When tapping filter icon:**
+- Modal bottom sheet or dialog
+- **Transaction Type** (multi-select checkboxes):
+  - ☐ All Types
+  - ☐ Deposits
+  - ☐ Withdrawals
+  - ☐ Rent Payments
+  - ☐ Refunds
+  - ☐ Cancellation Fees
+- **Date Range** (radio buttons):
+  - ○ All Time
+  - ○ This Month
+  - ○ Last Month
+  - ○ Last 3 Months
+  - ○ Custom Range (date pickers)
+- **Sort Order** (radio buttons):
+  - ○ Newest First
+  - ○ Oldest First
+- Actions:
+  - "Clear Filters" button
+  - "Apply Filters" button (primary)
+
+#### Related Entities
+- `transactions` table (fetch user's transactions)
+- `users` table (fetch current balance)
+- `bookings` table (if transaction related to booking)
+- `apartments` table (if transaction related to booking)
+
+#### API Endpoints
+- `GET /api/user/transactions`
+  - Query params:
+    - `page` (number, default 1)
+    - `per_page` (number, default 20)
+    - `type` (string, optional: deposit, withdrawal, rent_payment, refund, cancellation_fee)
+    - `date_from` (date, optional)
+    - `date_to` (date, optional)
+    - `sort` (string: newest, oldest)
+  - Response:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "balance": 2500.00,
+        "transactions": [
+          {
+            "id": 1,
+            "type": "rent_payment",
+            "amount": 1500.00,
+            "description": "Rent payment for booking #12345",
+            "related_booking_id": 12345,
+            "related_user_id": 5,
+            "created_at": "2024-12-10T09:00:00Z",
+            "booking": {
+              "id": 12345,
+              "apartment": {
+                "id": 10,
+                "name": "Cozy Downtown Apartment",
+                "address": "123 Main St, Cairo"
+              }
+            }
+          },
+          {
+            "id": 2,
+            "type": "deposit",
+            "amount": 500.00,
+            "description": "Cash deposit from admin",
+            "created_at": "2024-12-15T10:30:00Z"
+          }
+        ],
+        "pagination": {
+          "current_page": 1,
+          "total_pages": 5,
+          "has_more": true
+        }
+      }
+    }
+    ```
+
+#### Notes
+- Transactions are displayed in chronological order (newest first by default)
+- Amount display: Green for increases (+), Red/Orange for decreases (-)
+- Transaction types have distinct icons for quick visual identification
+- Transactions related to bookings are tappable to view booking details
+- Balance displayed at top updates when transactions are loaded
+- Consider adding export to PDF/CSV feature in future
+
+---
+
+### 6.1.6 Edit Profile Screen
 
 **Screen ID**: `SHARED-005`
 
@@ -4043,7 +4312,7 @@ Allow users to change app language between Arabic and English.
 
 ---
 
-### 6.1.7 Theme Settings Screen
+### 6.1.8 Theme Settings Screen
 
 **Screen ID**: `SHARED-007`
 
@@ -4230,10 +4499,10 @@ Allow users to switch between light and dark theme modes.
 **Owner Screens (6 screens):**
 - OWNER-001 to OWNER-006
 
-**Shared Screens (7 screens):**
-- SHARED-001 to SHARED-007
+**Shared Screens (8 screens):**
+- SHARED-001 to SHARED-008 (Transaction History added)
 
-**Total: 35 screens documented**
+**Total: 36 screens documented**
 
 ### 8.2 API Endpoint Summary
 
@@ -4291,7 +4560,7 @@ All API endpoints follow RESTful conventions:
 - **Authentication**: 9 screens (registration, login, OTP)
 - **Tenant Screens**: 13 screens (browse, book, manage, rate)
 - **Owner Screens**: 6 screens (manage apartments, handle requests)
-- **Shared Screens**: 7 screens (messages, profile, settings)
+- **Shared Screens**: 8 screens (messages, profile, transaction history, settings)
 
 ### Each Screen Includes:
 ✅ Purpose and user entry points  

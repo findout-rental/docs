@@ -31,6 +31,7 @@ This document describes the database design for FindOut application. The databas
 - **Messages**
 - **Notifications**
 - **OTP Verifications**
+- **Transactions** (Payment system)
 
 ---
 
@@ -57,6 +58,7 @@ This document describes the database design for FindOut application. The databas
 | role                | ENUM('tenant', 'owner', 'admin')        | NOT NULL                                              | User role                            |
 | status              | ENUM('pending', 'approved', 'rejected') | NOT NULL, DEFAULT 'pending'                           | Registration status                  |
 | language_preference | ENUM('ar', 'en')                        | DEFAULT 'en'                                          | Preferred language for notifications |
+| balance             | DECIMAL(10, 2)                          | NOT NULL, DEFAULT 0.00                                | User account balance                 |
 | created_at          | TIMESTAMP                               | DEFAULT CURRENT_TIMESTAMP                             | Registration date                    |
 | updated_at          | TIMESTAMP                               | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | Last update date                     |
 
@@ -87,8 +89,8 @@ This document describes the database design for FindOut application. The databas
 | city_ar        | VARCHAR(100)                          | NULL                                                  | City name (Arabic)                                          |
 | address        | TEXT                                  | NOT NULL                                              | Full address (English)                                      |
 | address_ar     | TEXT                                  | NULL                                                  | Full address (Arabic)                                       |
-| price          | DECIMAL(10, 2)                        | NOT NULL                                              | Rental price                                                |
-| price_period   | ENUM('night', 'day', 'month')         | NOT NULL, DEFAULT 'night'                             | Price period (per night/day/month)                          |
+| nightly_price  | DECIMAL(10, 2)                        | NOT NULL                                              | Price per night/day                                         |
+| monthly_price  | DECIMAL(10, 2)                        | NOT NULL                                              | Price per month (30 days)                                   |
 | bedrooms       | TINYINT UNSIGNED                      | NOT NULL                                              | Number of bedrooms                                          |
 | bathrooms      | TINYINT UNSIGNED                      | NOT NULL                                              | Number of bathrooms                                         |
 | living_rooms   | TINYINT UNSIGNED                      | NOT NULL                                              | Number of living rooms                                      |
@@ -110,7 +112,7 @@ This document describes the database design for FindOut application. The databas
 - INDEX (city)
 - INDEX (city_ar)
 - INDEX (status)
-- INDEX (price)
+- INDEX (nightly_price)
 
 **Notes:**
 
@@ -120,6 +122,7 @@ This document describes the database design for FindOut application. The databas
 - Owner can provide Arabic translations when adding/editing apartment
 - Frontend displays appropriate language based on user's language preference
 - Owner must be approved before creating apartments
+- **Pricing**: Owner sets both nightly_price and monthly_price. System automatically uses the better rate based on booking duration (compares daily calculation vs monthly calculation and uses whichever is cheaper)
 
 ---
 
@@ -140,6 +143,7 @@ This document describes the database design for FindOut application. The databas
 | check_out_date   | DATE                                                                                                                            | NOT NULL                                              | Check-out date                                            |
 | number_of_guests | TINYINT UNSIGNED                                                                                                                | NULL                                                  | Number of guests                                          |
 | payment_method   | VARCHAR(50)                                                                                                                     | NOT NULL                                              | Payment method confirmation (e.g., "Cash", "Credit Card") |
+| total_rent       | DECIMAL(10, 2)                                                                                                                  | NOT NULL                                              | Total rent amount calculated for this booking            |
 | status           | ENUM('pending', 'approved', 'rejected', 'cancelled', 'modified_pending', 'modified_approved', 'modified_rejected', 'completed') | NOT NULL, DEFAULT 'pending'                           | Booking status                                            |
 | created_at       | TIMESTAMP                                                                                                                       | DEFAULT CURRENT_TIMESTAMP                             | Booking creation date                                     |
 | updated_at       | TIMESTAMP                                                                                                                       | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | Last update date                                          |
@@ -334,6 +338,52 @@ This document describes the database design for FindOut application. The databas
 
 ---
 
+### 2.9 Transactions Entity
+
+**Table Name:** `transactions`
+
+**Description:** Stores all balance transactions for users including deposits, withdrawals, rent payments, refunds, and cancellation fees.
+
+**Attributes:**
+
+| Attribute          | Type                                                                                                                          | Constraints                                           | Description                                                                    |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------ |
+| id                 | BIGINT UNSIGNED                                                                                                               | PRIMARY KEY, AUTO_INCREMENT                           | Unique transaction identifier                                                  |
+| user_id            | BIGINT UNSIGNED                                                                                                               | FOREIGN KEY, NOT NULL                                 | Reference to users.id (user whose balance is affected)                         |
+| type               | ENUM('deposit', 'withdrawal', 'rent_payment', 'refund', 'cancellation_fee')                                                  | NOT NULL                                              | Transaction type                                                               |
+| amount             | DECIMAL(10, 2)                                                                                                                | NOT NULL                                              | Transaction amount (positive for deposits/additions, negative for withdrawals) |
+| related_booking_id | BIGINT UNSIGNED                                                                                                               | FOREIGN KEY, NULL                                     | Reference to bookings.id (if transaction is related to booking)                |
+| related_user_id    | BIGINT UNSIGNED                                                                                                               | FOREIGN KEY, NULL                                     | Reference to users.id (related user, e.g., owner in rent payment)              |
+| description        | TEXT                                                                                                                          | NULL                                                  | Transaction description/notes                                                  |
+| created_at         | TIMESTAMP                                                                                                                     | DEFAULT CURRENT_TIMESTAMP                             | Transaction timestamp                                                          |
+
+**Indexes:**
+
+- PRIMARY KEY (id)
+- FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+- FOREIGN KEY (related_booking_id) REFERENCES bookings(id) ON DELETE SET NULL
+- FOREIGN KEY (related_user_id) REFERENCES users(id) ON DELETE SET NULL
+- INDEX (user_id)
+- INDEX (type)
+- INDEX (related_booking_id)
+- INDEX (created_at)
+
+**Notes:**
+
+- Tracks all balance changes for complete audit trail
+- Transaction types:
+  - `deposit`: Admin adds money to user balance (e.g., tenant pays admin cash)
+  - `withdrawal`: Admin removes money from user balance (e.g., owner withdraws from admin)
+  - `rent_payment`: Rent transferred from tenant to owner when booking is created
+  - `refund`: Full refund returned to tenant (when booking rejected)
+  - `cancellation_fee`: Partial refund (80% returned to tenant, 20% kept by owner as fee)
+- Amount can be positive (increases balance) or negative (decreases balance)
+- `related_booking_id` links transaction to specific booking
+- `related_user_id` tracks the other party in transfers (e.g., owner receiving rent payment)
+- `description` field allows admin to add notes (e.g., "Cash deposit from tenant John")
+
+---
+
 ## 3. Relationships
 
 ### 3.1 Users Relationships
@@ -379,6 +429,11 @@ This document describes the database design for FindOut application. The databas
    - Foreign Key: `notifications.user_id` → `users.id`
    - Cascade Delete: Yes
 
+8. **Users → Transactions (One-to-Many)**
+   - One user can have many transactions
+   - Foreign Key: `transactions.user_id` → `users.id`
+   - Cascade Delete: Yes
+
 ### 3.2 Apartments Relationships
 
 1. **Apartments → Bookings (One-to-Many)**
@@ -412,6 +467,11 @@ This document describes the database design for FindOut application. The databas
    - Foreign Key: `notifications.booking_id` → `bookings.id`
    - Cascade Delete: SET NULL (notification history preserved)
 
+3. **Bookings → Transactions (One-to-Many)**
+   - One booking can have multiple transactions (rent payment, refund, cancellation fee)
+   - Foreign Key: `transactions.related_booking_id` → `bookings.id`
+   - Cascade Delete: SET NULL (transaction history preserved even if booking deleted)
+
 ---
 
 ## 4. Entity-Relationship Diagram
@@ -427,6 +487,7 @@ erDiagram
     USERS ||--o{ MESSAGES : "sends"
     USERS ||--o{ MESSAGES : "receives"
     USERS ||--o{ NOTIFICATIONS : "receives"
+    USERS ||--o{ TRANSACTIONS : "has"
 
     APARTMENTS ||--o{ BOOKINGS : "has"
     APARTMENTS ||--o{ RATINGS : "receives"
@@ -434,6 +495,7 @@ erDiagram
 
     BOOKINGS ||--|| RATINGS : "rated_once"
     BOOKINGS ||--o{ NOTIFICATIONS : "generates"
+    BOOKINGS ||--o{ TRANSACTIONS : "generates"
 
     USERS {
         bigint id PK
@@ -447,6 +509,7 @@ erDiagram
         enum role
         enum status
         enum language_preference
+        decimal balance
         timestamp created_at
         timestamp updated_at
     }
@@ -461,7 +524,8 @@ erDiagram
         text address
         text address_ar
         decimal price
-        enum price_period
+        decimal nightly_price
+        decimal monthly_price
         tinyint bedrooms
         tinyint bathrooms
         tinyint living_rooms
@@ -483,6 +547,7 @@ erDiagram
         date check_out_date
         tinyint number_of_guests
         varchar payment_method
+        decimal total_rent
         enum status
         timestamp created_at
         timestamp updated_at
@@ -538,6 +603,17 @@ erDiagram
         timestamp verified_at
         timestamp created_at
     }
+
+    TRANSACTIONS {
+        bigint id PK
+        bigint user_id FK
+        enum type
+        decimal amount
+        bigint related_booking_id FK
+        bigint related_user_id FK
+        text description
+        timestamp created_at
+    }
 ```
 
 ---
@@ -560,6 +636,7 @@ CREATE TABLE users (
     role ENUM('tenant', 'owner', 'admin') NOT NULL,
     status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
     language_preference ENUM('ar', 'en') DEFAULT 'en',
+    balance DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_role (role),
@@ -576,8 +653,8 @@ CREATE TABLE apartments (
     city_ar VARCHAR(100),
     address TEXT NOT NULL,
     address_ar TEXT,
-    price DECIMAL(10, 2) NOT NULL,
-    price_period ENUM('night', 'day', 'month') NOT NULL DEFAULT 'night',
+    nightly_price DECIMAL(10, 2) NOT NULL,
+    monthly_price DECIMAL(10, 2) NOT NULL,
     bedrooms TINYINT UNSIGNED NOT NULL,
     bathrooms TINYINT UNSIGNED NOT NULL,
     living_rooms TINYINT UNSIGNED NOT NULL,
@@ -608,6 +685,7 @@ CREATE TABLE bookings (
     check_out_date DATE NOT NULL,
     number_of_guests TINYINT UNSIGNED,
     payment_method VARCHAR(50) NOT NULL,
+    total_rent DECIMAL(10, 2) NOT NULL,
     status ENUM('pending', 'approved', 'rejected', 'cancelled', 'modified_pending', 'modified_approved', 'modified_rejected', 'completed') NOT NULL DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -695,6 +773,25 @@ CREATE TABLE otp_verifications (
     INDEX idx_mobile (mobile_number, expires_at),
     INDEX idx_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Transactions Table
+CREATE TABLE transactions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    type ENUM('deposit', 'withdrawal', 'rent_payment', 'refund', 'cancellation_fee') NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    related_booking_id BIGINT UNSIGNED,
+    related_user_id BIGINT UNSIGNED,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (related_booking_id) REFERENCES bookings(id) ON DELETE SET NULL,
+    FOREIGN KEY (related_user_id) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_user (user_id),
+    INDEX idx_type (type),
+    INDEX idx_booking (related_booking_id),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
 ---
@@ -731,6 +828,16 @@ CREATE TABLE otp_verifications (
 - Enforced by UNIQUE constraint on booking_id
 - Rating only allowed after booking period ends (application logic)
 
+### 6.6 Payment System Design
+
+- Balance stored directly in users table for quick access
+- Transactions table provides complete audit trail of all balance changes
+- Rent calculated at booking creation: `apartment.price * number_of_periods`
+- Total rent stored in bookings table for reference
+- Payment happens immediately when booking is created (before owner approval)
+- Refund logic handles rejection (full refund) vs cancellation (partial refund with fee)
+- Transaction types clearly distinguish different payment flows
+
 ---
 
 ## 7. Indexes Summary
@@ -744,6 +851,7 @@ CREATE TABLE otp_verifications (
 - **Favorites:** tenant_id, apartment_id (composite unique)
 - **Messages:** sender_id+recipient_id (conversation lookup), recipient_id+is_read
 - **Notifications:** user_id+is_read (unread notifications)
+- **Transactions:** user_id, type, related_booking_id, created_at (for transaction history queries)
 
 ---
 
@@ -763,6 +871,16 @@ CREATE TABLE otp_verifications (
 - Ratings only after booking period ends
 - Cancellation only 24+ hours before check-in
 - OTP expiration (5 minutes typical)
+
+**Payment System Rules:**
+- Tenant must have sufficient balance before booking (check balance >= total_rent)
+- Rent is transferred from tenant to owner when booking is created
+- If booking is rejected by owner: Full refund (100%) returned to tenant from owner
+- If booking is cancelled by tenant: Partial refund (80% to tenant, 20% cancellation fee kept by owner)
+- Admin can add money to tenant balance (when tenant pays cash to admin)
+- Admin can withdraw money from owner balance (when owner takes money from admin)
+- All balance changes are tracked in transactions table for audit trail
+- Rent calculation: System compares `nightly_price × number_of_nights` vs `monthly_price × ceil(number_of_nights/30)` and uses whichever is cheaper. For bookings ≤ 30 days, uses daily rate calculation.
 
 ---
 

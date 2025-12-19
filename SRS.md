@@ -258,7 +258,7 @@ Users must be able to browse apartments and view their complete specifications.
 - **REQ-M-004.1:** System shall display a list of available apartments
 - **REQ-M-004.2:** System shall display apartment specifications including:
   - Location (Governorate, City, Address)
-  - Price (per night/day/month as specified by owner)
+  - Price (nightly rate and monthly rate - system uses best rate)
   - Number of Bedrooms
   - Number of Bathrooms
   - Number of Living Rooms
@@ -355,9 +355,13 @@ Multiple users must be able to book apartments for specific periods without book
 - **REQ-B-002.3:** System shall prevent booking if any part of the requested period overlaps with existing approved bookings
 - **REQ-B-002.4:** System shall display error message if dates conflict
 - **REQ-B-002.5:** System shall only allow booking for available date ranges
-- **REQ-B-002.6:** System shall require payment method confirmation (no actual payment processing)
-- **REQ-B-002.7:** System shall create booking with status "Pending" after submission
-- **REQ-B-002.8:** System shall require owner approval before booking is confirmed
+- **REQ-B-002.6:** System shall check tenant balance before allowing booking
+- **REQ-B-002.7:** System shall prevent booking if tenant has insufficient balance
+- **REQ-B-002.8:** System shall calculate total rent amount using nightly and monthly prices, automatically selecting the better rate for the booking duration
+- **REQ-B-002.9:** System shall transfer rent from tenant balance to owner balance when booking is created
+- **REQ-B-002.10:** System shall create transaction records for rent payment
+- **REQ-B-002.11:** System shall create booking with status "Pending" after payment is processed
+- **REQ-B-002.12:** System shall require owner approval before booking is confirmed
 
 **Input:**
 
@@ -377,10 +381,14 @@ Multiple users must be able to book apartments for specific periods without book
 - User is logged in as Tenant
 - Apartment exists and is active
 - Selected dates are in the future
+- Tenant has sufficient balance (balance >= total_rent)
 
 **Postconditions:**
 
-- Booking created with "Pending" status
+- Total rent calculated and stored in booking
+- Rent transferred from tenant balance to owner balance
+- Transaction records created for payment
+- Booking created with "Pending" status and total_rent
 - Owner receives notification of booking request
 - Tenant receives confirmation notification
 
@@ -403,7 +411,9 @@ Users must be able to cancel or modify their bookings with specific rules and ow
 - **REQ-B-003.6:** System shall allow cancellation up to 24 hours before check-in time
 - **REQ-B-003.7:** System shall prevent cancellation less than 24 hours before check-in
 - **REQ-B-003.8:** System shall update booking status to "Cancelled" upon cancellation
-- **REQ-B-003.9:** System shall send notifications for all modification and cancellation actions
+- **REQ-B-003.9:** System shall process partial refund when booking is cancelled (80% to tenant, 20% kept by owner as cancellation fee)
+- **REQ-B-003.10:** System shall create transaction records for refund and cancellation fee
+- **REQ-B-003.11:** System shall send notifications for all modification and cancellation actions
 
 **Input:**
 
@@ -736,7 +746,8 @@ Apartment owners must be able to add and manage their apartments through the mob
 - **REQ-O-001.1:** System shall allow owners to add apartments via mobile app
 - **REQ-O-001.2:** System shall require all mandatory fields to be completed immediately:
   - Location (Governorate, City, Address) - required
-  - Price (per night/day/month) - required
+  - Nightly Price (per night) - required
+  - Monthly Price (per month) - required
   - Number of Bedrooms - required
   - Number of Bathrooms - required
   - Number of Living Rooms - required
@@ -786,7 +797,9 @@ Apartment owners must be able to manage booking requests for their apartments th
 - **REQ-O-002.4:** System shall allow owners to approve modification requests
 - **REQ-O-002.5:** System shall allow owners to reject modification requests
 - **REQ-O-002.6:** System shall display booking details before approval/rejection
-- **REQ-O-002.7:** System shall send notifications to tenants upon owner action
+- **REQ-O-002.7:** System shall process full refund when owner rejects booking (100% returned to tenant from owner)
+- **REQ-O-002.8:** System shall create transaction records for refund when booking is rejected
+- **REQ-O-002.9:** System shall send notifications to tenants upon owner action
 
 **Input:**
 
@@ -806,6 +819,8 @@ Apartment owners must be able to manage booking requests for their apartments th
 **Postconditions:**
 
 - Booking status changed
+- If rejected: Full refund processed (rent returned from owner to tenant)
+- Transaction records created (if refund processed)
 - Tenant notified
 
 ---
@@ -892,6 +907,187 @@ System administrators must be able to delete users from the application.
 
 - User account deleted
 - User data removed from system
+
+---
+
+### 3.6 Payment System Features
+
+#### 3.6.1 Balance Management (REQ-PAY-001)
+
+**Priority:** Basic
+
+**Description:**
+System must maintain account balances for all users (tenants and owners) and track all balance transactions.
+
+**Functional Requirements:**
+
+- **REQ-PAY-001.1:** System shall maintain balance for each user (tenant and owner)
+- **REQ-PAY-001.2:** System shall initialize user balance to 0.00 when account is created
+- **REQ-PAY-001.3:** System shall track all balance changes in transactions table
+- **REQ-PAY-001.4:** System shall allow users to view their current balance
+- **REQ-PAY-001.5:** System shall allow users to view their transaction history
+
+**Input:**
+
+- User ID (from session)
+
+**Output:**
+
+- Current balance
+- Transaction history list
+
+**Preconditions:**
+
+- User is logged in
+
+**Postconditions:**
+
+- Balance and transaction history displayed
+
+---
+
+#### 3.6.2 Admin Balance Operations (REQ-PAY-002)
+
+**Priority:** Basic
+
+**Description:**
+System administrators must be able to add money to tenant balances and withdraw money from owner balances through the admin web application.
+
+**Functional Requirements:**
+
+- **REQ-PAY-002.1:** System shall allow Admin to add money to tenant balance
+- **REQ-PAY-002.2:** System shall allow Admin to add optional description/notes when adding money (e.g., "Cash deposit from tenant John")
+- **REQ-PAY-002.3:** System shall update tenant balance when money is added
+- **REQ-PAY-002.4:** System shall create transaction record with type "deposit" when money is added
+- **REQ-PAY-002.5:** System shall allow Admin to withdraw money from owner balance
+- **REQ-PAY-002.6:** System shall allow Admin to add optional description/notes when withdrawing money
+- **REQ-PAY-002.7:** System shall check owner has sufficient balance before allowing withdrawal
+- **REQ-PAY-002.8:** System shall update owner balance when money is withdrawn
+- **REQ-PAY-002.9:** System shall create transaction record with type "withdrawal" when money is withdrawn
+- **REQ-PAY-002.10:** System shall display error message if owner has insufficient balance for withdrawal
+
+**Input:**
+
+- User ID (tenant or owner)
+- Amount (positive decimal)
+- Optional description/notes
+- Action type (deposit for tenant, withdrawal for owner)
+
+**Output:**
+
+- Balance updated confirmation
+- Transaction record created
+- Error message (if insufficient balance for withdrawal)
+
+**Preconditions:**
+
+- Admin is logged in to Flutter web application
+- User exists and is approved
+- For withdrawal: Owner has sufficient balance
+
+**Postconditions:**
+
+- User balance updated
+- Transaction record created with description
+- Balance change logged for audit trail
+
+---
+
+#### 3.6.3 Rent Payment Processing (REQ-PAY-003)
+
+**Priority:** Basic
+
+**Description:**
+System must process rent payments when tenants book apartments, transferring money from tenant balance to owner balance.
+
+**Functional Requirements:**
+
+- **REQ-PAY-003.1:** System shall calculate total rent amount based on:
+  - Apartment price per period (night/day/month)
+  - Number of periods (check-in to check-out)
+  - Formula: `apartment.price * number_of_periods`
+- **REQ-PAY-003.2:** System shall check tenant balance is sufficient before processing payment
+- **REQ-PAY-003.3:** System shall prevent booking if tenant has insufficient balance
+- **REQ-PAY-003.4:** System shall deduct total rent from tenant balance when booking is created
+- **REQ-PAY-003.5:** System shall add total rent to owner balance when booking is created
+- **REQ-PAY-003.6:** System shall create transaction record with type "rent_payment" for tenant (negative amount)
+- **REQ-PAY-003.7:** System shall create transaction record with type "rent_payment" for owner (positive amount)
+- **REQ-PAY-003.8:** System shall link both transaction records to the booking via related_booking_id
+- **REQ-PAY-003.9:** System shall store calculated total_rent in bookings table
+
+**Input:**
+
+- Booking details (tenant_id, apartment_id, check_in_date, check_out_date)
+- Apartment nightly_price and monthly_price
+
+**Output:**
+
+- Payment processed confirmation
+- Transaction records created
+- Booking created with total_rent
+
+**Preconditions:**
+
+- Tenant is logged in
+- Tenant has sufficient balance
+- Apartment exists and is active
+- Selected dates are valid
+
+**Postconditions:**
+
+- Tenant balance decreased by total_rent
+- Owner balance increased by total_rent
+- Transaction records created and linked to booking
+- Booking created with total_rent stored
+
+---
+
+#### 3.6.4 Refund Processing (REQ-PAY-004)
+
+**Priority:** Basic
+
+**Description:**
+System must process refunds when bookings are rejected by owners or cancelled by tenants, with different refund policies for each scenario.
+
+**Functional Requirements:**
+
+- **REQ-PAY-004.1:** System shall process full refund (100%) when owner rejects booking
+- **REQ-PAY-004.2:** System shall transfer full rent amount from owner balance back to tenant balance when booking is rejected
+- **REQ-PAY-004.3:** System shall create transaction record with type "refund" for tenant (positive amount)
+- **REQ-PAY-004.4:** System shall create transaction record with type "refund" for owner (negative amount)
+- **REQ-PAY-004.5:** System shall link refund transactions to the booking via related_booking_id
+- **REQ-PAY-004.6:** System shall process partial refund when tenant cancels booking
+- **REQ-PAY-004.7:** System shall calculate partial refund as 80% of total rent
+- **REQ-PAY-004.8:** System shall calculate cancellation fee as 20% of total rent (kept by owner)
+- **REQ-PAY-004.9:** System shall transfer 80% of rent from owner balance back to tenant balance when booking is cancelled
+- **REQ-PAY-004.10:** System shall create transaction record with type "refund" for tenant (80% of total rent, positive amount)
+- **REQ-PAY-004.11:** System shall create transaction record with type "cancellation_fee" for owner (20% of total rent, no balance change, owner already has the money)
+- **REQ-PAY-004.12:** System shall link cancellation transactions to the booking via related_booking_id
+
+**Input:**
+
+- Booking ID
+- Refund reason (rejected or cancelled)
+- Total rent amount (from booking)
+
+**Output:**
+
+- Refund processed confirmation
+- Transaction records created
+- Balance updates completed
+
+**Preconditions:**
+
+- Booking exists with status "pending" or "approved"
+- Booking has total_rent amount
+- Owner has sufficient balance (for rejection refund)
+
+**Postconditions:**
+
+- If rejected: Full refund processed, balances updated
+- If cancelled: Partial refund (80%) processed, cancellation fee (20%) recorded
+- Transaction records created and linked to booking
+- Refund logged for audit trail
 
 ---
 

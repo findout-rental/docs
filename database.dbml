@@ -23,6 +23,7 @@ Table users {
   role user_role [not null, note: 'User role: tenant, owner, or admin']
   status user_status [not null, default: 'pending', note: 'Registration status']
   language_preference language_pref [default: 'en', note: 'Preferred language']
+  balance decimal(10,2) [not null, default: 0.00, note: 'User account balance']
   created_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'Registration date']
   updated_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'Last update date']
   
@@ -45,8 +46,8 @@ Table apartments {
   city_ar varchar(100) [note: 'City name (Arabic)']
   address text [not null, note: 'Full address (English)']
   address_ar text [note: 'Full address (Arabic)']
-  price decimal(10,2) [not null, note: 'Rental price']
-  price_period price_period_enum [not null, default: 'night', note: 'Price period']
+  nightly_price decimal(10,2) [not null, note: 'Price per night/day']
+  monthly_price decimal(10,2) [not null, note: 'Price per month (30 days)']
   bedrooms tinyint [not null, note: 'Number of bedrooms']
   bathrooms tinyint [not null, note: 'Number of bathrooms']
   living_rooms tinyint [not null, note: 'Number of living rooms']
@@ -66,7 +67,7 @@ Table apartments {
     city [name: 'idx_city']
     city_ar [name: 'idx_city_ar']
     status [name: 'idx_status']
-    price [name: 'idx_price']
+    nightly_price [name: 'idx_nightly_price']
   }
 }
 
@@ -82,6 +83,7 @@ Table bookings {
   check_out_date date [not null, note: 'Check-out date']
   number_of_guests tinyint [note: 'Number of guests']
   payment_method varchar(50) [not null, note: 'Payment method confirmation']
+  total_rent decimal(10,2) [not null, note: 'Total rent amount calculated for this booking']
   status booking_status [not null, default: 'pending', note: 'Booking status']
   created_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'Booking creation date']
   updated_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'Last update date']
@@ -204,6 +206,30 @@ Table otp_verifications {
 }
 
 // =====================================================
+// Table: transactions
+// Description: Stores all balance transactions (deposits, withdrawals, payments, refunds)
+// =====================================================
+Table transactions {
+  id bigint [pk, increment, note: 'Unique transaction identifier']
+  user_id bigint [ref: > users.id, not null, note: 'Reference to user whose balance is affected']
+  type transaction_type [not null, note: 'Transaction type']
+  amount decimal(10,2) [not null, note: 'Transaction amount (positive for deposits, negative for withdrawals)']
+  related_booking_id bigint [ref: > bookings.id, note: 'Reference to booking (if transaction is related to booking)']
+  related_user_id bigint [ref: > users.id, note: 'Reference to related user (e.g., owner in rent payment)']
+  description text [note: 'Transaction description/notes']
+  created_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'Transaction timestamp']
+  
+  indexes {
+    user_id [name: 'idx_user']
+    type [name: 'idx_type']
+    related_booking_id [name: 'idx_booking']
+    created_at [name: 'idx_created']
+  }
+  
+  Note: 'Tracks all balance changes for audit trail. Amount can be positive (deposit) or negative (withdrawal).'
+}
+
+// =====================================================
 // ENUMS
 // =====================================================
 Enum user_role {
@@ -223,12 +249,6 @@ Enum language_pref {
   en
 }
 
-Enum price_period_enum {
-  night
-  day
-  month
-}
-
 Enum apartment_status {
   active
   inactive
@@ -246,6 +266,14 @@ Enum booking_status {
   completed
 }
 
+Enum transaction_type {
+  deposit
+  withdrawal
+  rent_payment
+  refund
+  cancellation_fee
+}
+
 // =====================================================
 // RELATIONSHIPS SUMMARY
 // =====================================================
@@ -261,5 +289,7 @@ Enum booking_status {
 // 10. Apartments (1) -> (M) Favorites (apartment_id) - One apartment can be favorited by many
 // 11. Bookings (1) -> (1) Ratings (booking_id) - One booking can have one rating
 // 12. Bookings (1) -> (M) Notifications (booking_id) - One booking can generate many notifications
+// 13. Users (1) -> (M) Transactions (user_id) - One user can have many transactions
+// 14. Bookings (1) -> (M) Transactions (related_booking_id) - One booking can have multiple transactions
 // =====================================================
 

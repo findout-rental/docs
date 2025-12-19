@@ -44,6 +44,8 @@ The Admin Web Application provides system administrators with tools to:
 - **Manage users** (view all users, delete users)
 - **View system statistics** (dashboard with key metrics)
 - **Monitor platform activity** (users, apartments, bookings)
+- **Manage user balances** (add money to tenants, withdraw from owners)
+- **View transaction history** (audit trail of all balance operations)
 - **Configure settings** (language, theme)
 
 **Access:** Desktop/laptop browsers only (minimum 1024px width)
@@ -968,7 +970,15 @@ Display all users in the system with master-detail layout for viewing and managi
 - **ID Photo**: Thumbnail with click to enlarge
 - **Verification Status**: Verified by Admin on [date]
 
-**Section 3: Activity Summary**
+**Section 3: Account Balance**
+- Label: "Account Balance"
+- **Current Balance**: "EGP 2,500.00" (large, prominent display)
+- **Balance Actions**:
+  - **Add Money** button (for tenants) → Opens Add Money Dialog
+  - **Withdraw Money** button (for owners) → Opens Withdraw Money Dialog
+  - **View Transaction History** link → Opens Transaction History Panel
+
+**Section 4: Activity Summary**
 - Label: "Activity Summary"
 
 **For Tenants:**
@@ -983,7 +993,7 @@ Display all users in the system with master-detail layout for viewing and managi
 - Total Bookings Received: 45
 - Average Rating: ⭐ 4.5
 
-**Section 4: Account Actions**
+**Section 5: Account Actions**
 
 **Action Buttons:**
 - **View Full Profile** (secondary) - Future feature
@@ -1002,6 +1012,9 @@ Display all users in the system with master-detail layout for viewing and managi
 - Select sort → Re-sort list
 - Click user card → Load details in right panel (highlight selected)
 - Click ID photo thumbnail → Open full-screen viewer
+- Click "Add Money" (tenant) → Opens Add Money Dialog
+- Click "Withdraw Money" (owner) → Opens Withdraw Money Dialog
+- Click "View Transaction History" → Opens Transaction History Panel
 - Click "Delete User" →
   - If active bookings: Show error tooltip
   - If no active bookings: Show delete confirmation dialog
@@ -1115,6 +1128,7 @@ Display all users in the system with master-detail layout for viewing and managi
           "status": "approved",
           "created_at": "2024-12-15T10:00:00Z"
         },
+        "balance": 2500.00,
         "statistics": {
           "total_bookings": 12,
           "active_bookings": 2,
@@ -1145,6 +1159,188 @@ Display all users in the system with master-detail layout for viewing and managi
     }
     ```
 
+#### Add Money Dialog
+
+**When clicking "Add Money" (for tenants):**
+- Modal dialog overlay
+- Title: "Add Money to Tenant Balance"
+- User info: Photo, name, current balance displayed
+- **Amount Input**:
+  - Label: "Amount to Add"
+  - Currency: EGP
+  - Number input (min: 0.01, max: 999999.99)
+  - Placeholder: "0.00"
+- **Description/Notes** (optional):
+  - Text area
+  - Label: "Notes (optional)"
+  - Placeholder: "e.g., Cash deposit from tenant"
+  - Max 255 characters
+- **Preview**:
+  - Current Balance: EGP 2,500.00
+  - Amount to Add: EGP 500.00
+  - New Balance: EGP 3,000.00
+- Actions:
+  - "Cancel" button (secondary)
+  - "Add Money" button (primary, enabled when amount > 0)
+
+**On Submit:**
+- Show loading state
+- API call to add money
+- On success:
+  - Close dialog
+  - Update balance in detail panel
+  - Show success toast: "EGP 500.00 added successfully"
+  - Refresh user details
+- On error:
+  - Show error message in dialog
+
+---
+
+#### Withdraw Money Dialog
+
+**When clicking "Withdraw Money" (for owners):**
+- Modal dialog overlay
+- Title: "Withdraw Money from Owner Balance"
+- User info: Photo, name, current balance displayed prominently
+- **Amount Input**:
+  - Label: "Amount to Withdraw"
+  - Currency: EGP
+  - Number input (min: 0.01, max: current_balance)
+  - Placeholder: "0.00"
+  - Max value: Cannot exceed current balance
+- **Description/Notes** (optional):
+  - Text area
+  - Label: "Notes (optional)"
+  - Placeholder: "e.g., Cash withdrawal for owner"
+  - Max 255 characters
+- **Balance Validation**:
+  - If amount > balance: Show error "Amount exceeds available balance"
+  - Submit button disabled if insufficient balance
+- **Preview**:
+  - Current Balance: EGP 5,000.00
+  - Amount to Withdraw: EGP 2,000.00
+  - New Balance: EGP 3,000.00
+- Actions:
+  - "Cancel" button (secondary)
+  - "Withdraw Money" button (primary, enabled when amount > 0 and <= balance)
+
+**On Submit:**
+- Show loading state
+- API call to withdraw money
+- On success:
+  - Close dialog
+  - Update balance in detail panel
+  - Show success toast: "EGP 2,000.00 withdrawn successfully"
+  - Refresh user details
+- On error:
+  - Show error message in dialog
+  - If insufficient balance: "Owner does not have sufficient balance"
+
+---
+
+#### Transaction History Panel
+
+**When clicking "View Transaction History":**
+- Slide-out panel from right (500px width)
+- Title: "Transaction History - [User Name]"
+- Close button (X) in top-right
+
+**Panel Content:**
+
+**Current Balance Banner:**
+- Large display: "Current Balance: EGP 2,500.00"
+- Last updated timestamp
+
+**Filter Bar:**
+- Transaction Type filter: All | Deposits | Withdrawals | Rent Payments | Refunds | Cancellation Fees
+- Date Range: All Time | This Month | Last Month | Last 3 Months
+
+**Transaction List:**
+- Table or card list format
+- Columns/Fields:
+  - Date & Time
+  - Type (with icon)
+  - Amount (color-coded: green for +, red for -)
+  - Description
+  - Related Booking (if applicable, tappable)
+- Pagination at bottom (20 per page)
+
+**Transaction Item Display:**
+- Similar to mobile app transaction history
+- Click transaction → Can view booking details if related
+
+**Close:**
+- Click X or click outside panel → Close panel
+
+---
+
+#### API Endpoints (Balance Management)
+
+- `GET /api/admin/users/{user_id}/balance`
+  - Response:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "balance": 2500.00,
+        "updated_at": "2024-12-15T10:30:00Z"
+      }
+    }
+    ```
+
+- `POST /api/admin/users/{user_id}/deposit`
+  - Request:
+    ```json
+    {
+      "amount": 500.00,
+      "description": "Cash deposit from tenant"
+    }
+    ```
+  - Response:
+    ```json
+    {
+      "success": true,
+      "message": "Money added successfully",
+      "data": {
+        "new_balance": 3000.00,
+        "transaction_id": 123
+      }
+    }
+    ```
+
+- `POST /api/admin/users/{user_id}/withdraw`
+  - Request:
+    ```json
+    {
+      "amount": 2000.00,
+      "description": "Cash withdrawal for owner"
+    }
+    ```
+  - Response:
+    ```json
+    {
+      "success": true,
+      "message": "Money withdrawn successfully",
+      "data": {
+        "new_balance": 500.00,
+        "transaction_id": 124
+      }
+    }
+    ```
+  - Error Response (insufficient balance):
+    ```json
+    {
+      "success": false,
+      "error": "Insufficient balance. Available: EGP 500.00, Requested: EGP 2000.00"
+    }
+    ```
+
+- `GET /api/admin/users/{user_id}/transactions`
+  - Query params: `page`, `per_page`, `type`, `date_from`, `date_to`
+  - Response: Same format as user transaction history API
+
+---
+
 #### Notes
 - Master-detail layout provides efficient workflow
 - User list stays in view while viewing details
@@ -1153,6 +1349,10 @@ Display all users in the system with master-detail layout for viewing and managi
 - Consider adding user suspension feature (disable without delete)
 - Statistics help admin understand user activity before deletion
 - Role and status badges provide quick visual identification
+- Balance management is available for both tenants (deposit) and owners (withdraw)
+- All balance operations create transaction records for audit trail
+- Transaction history panel provides full transparency
+- Amount validation prevents invalid operations (negative amounts, exceeding balance)
 
 ---
 
